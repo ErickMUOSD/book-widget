@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --font-pixel: "Press Start 2P", ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0f1117;
+  --panel: #181b24;
+  --line: #2b3040;
+  --muted: #8b93a7;
+}
+
+body {
+  background: var(--bg);
+  color: #e6e8ee;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.pip-body {
+  margin: 0;
+  background: var(--bg);
+  color: #e6e8ee;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.pixel-btn {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  padding: 9px 12px;
+  border: 3px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
+}
+.pixel-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+.pixel-btn:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.widget-root .pixel-btn {
+  border-color: var(--w-border);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.field {
+  background: #0f1117;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+  font-size: 14px;
+}
+.field:focus {
+  outline: 2px solid #6d5ae6;
+  border-color: transparent;
+}
+.btn {
+  background: #6d5ae6;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn:hover:not(:disabled) {
+  background: #7d6cf0;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.btn-ghost {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: #222633;
+}
+.btn-danger {
+  border: 1px solid #7a2b33;
+  color: #ff8b95;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+  }
+}

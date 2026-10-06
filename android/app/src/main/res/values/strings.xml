@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Book Widget</string>
+    <string name="widget_description">Un personaje pixel art y el pre-spoiler del próximo capítulo.</string>
+</resources>

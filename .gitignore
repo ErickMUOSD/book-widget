@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env*
+!.env.example
+/backend/data/
+node_modules/
+.next/
+*.db
+*.db-wal
+*.db-shm
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+tsconfig.tsbuildinfo

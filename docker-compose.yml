@@ -1,0 +1,24 @@
+# Toda la infraestructura en tu servidor local:  docker compose up -d --build
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    volumes:
+      - bookwidget-data:/data
+    ports:
+      - "8000:8000"   # la app Android habla directamente con FastAPI (LAN/Tailscale)
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    env_file: ./web/.env
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  bookwidget-data:

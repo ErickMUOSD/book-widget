@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tu servidor vive en la red local (IP privada), que no se puede listar de antemano:
+     se permite HTTP. Para uso fuera de casa, usa Tailscale con HTTPS (recomendado). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
