@@ -63,19 +63,27 @@ sobre HTTPS o `localhost`**. Para usarlo desde otro equipo de la red, sirve el p
 (p. ej. `tailscale serve` o Caddy). Sin soporte PiP (Firefox/Safari) hay dos alternativas: instalar `/widget`
 como app (PWA) o activar el widget flotante dentro del panel en Ajustes.
 
-### App Android
+### App Android (autónoma, sin servidor)
 
-Necesita Android Studio (o el SDK de Android + JDK 17+):
+La app Android ya **no necesita el backend**: todo ocurre en el móvil y la única dependencia externa es una
+clave gratuita de [Groq](https://console.groq.com/keys), que se pide en el primer arranque.
 
 ```bash
 cd android && ./gradlew installDebug
 ```
 
-Abre la app, escribe la URL del servidor (`http://IP-DE-TU-SERVIDOR:8000`) y el token del dispositivo, y añade
-el widget desde la pantalla de inicio (mantener pulsado → Widgets → Book Widget). Redimensionable: 2×2 muestra
-personaje + «Terminé ✓»; 4×2 añade la leyenda sellada.
+- **Libros con texto real**: búsqueda en Project Gutenberg (Gutendex) y Wikisource, o tu propio EPUB sin DRM.
+  El EPUB se separa en capítulos con su índice (sin IA).
+- **Leyendas**: algoritmos clásicos sobre el texto (TF-IDF, TextRank, MMR; nunca se cita el último cuarto del
+  capítulo) eligen el pasaje, y Groq lo convierte en una leyenda de 30–50 palabras. Un validador rechaza lo que
+  invente y, si falla Groq o no hay red, se muestra la cita. Solo se narran el capítulo siguiente y el de después.
+- **Dibujos**: iconos de [game-icons.net](https://game-icons.net) (CC BY 3.0) elegidos por las palabras del
+  capítulo, pixelados a 32×32 y coloreados con la paleta del género (`poc/build_icons.py` los prepara).
+- **Widget** (Glance): personaje, leyenda sellada (tocar para leer), niebla/pista/peligro y «Terminé».
+  Se adapta al tamaño real y ajusta el texto al hueco disponible.
 
-> La app permite HTTP porque tu servidor está en una IP privada. Fuera de casa usa Tailscale (con HTTPS).
+`poc/` contiene los scripts con los que se probó cada pieza (extracción de capítulos, algoritmos, comparación de
+modelos para el narrador).
 
 ## Desarrollo
 

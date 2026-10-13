@@ -2,84 +2,53 @@ package com.bookwidget.app.data
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import java.io.File
 
-@Serializable
-data class Persisted(
-    val state: WidgetState? = null,
-    val busy: Boolean = false,
-    val error: String? = null,
-)
-
-/** Lo que dibuja el widget: estado + frames ya decodificados. */
+/** Lo que dibuja el widget: el libro activo + los frames ya renderizados. */
 class Snapshot(
     val configured: Boolean,
-    val state: WidgetState?,
+    val book: Book?,
     val busy: Boolean,
-    val error: String?,
     val frames: List<Bitmap>,
     val animate: Boolean,
 )
 
-/** Estado del widget en disco (JSON + PNG de los frames) para que dibuje sin red. */
 object WidgetStore {
-    private val mutex = Mutex()
-    private val json = Json { ignoreUnknownKeys = true }
+    /** Frames ya recortados por sprite: el widget se repinta a menudo y el dibujo casi nunca cambia. */
+    private val cache = android.util.LruCache<SpriteJson, List<Bitmap>>(8)
 
-    private fun file(ctx: Context) = File(ctx.filesDir, "widget_state.json")
-    private fun framesDir(ctx: Context) = File(ctx.filesDir, "frames").also { it.mkdirs() }
-    private fun frameFile(ctx: Context, spriteId: Long, i: Int) = File(framesDir(ctx), "${spriteId}_$i.png")
-
-    private fun read(ctx: Context): Persisted =
-        runCatching { json.decodeFromString<Persisted>(file(ctx).readText()) }.getOrDefault(Persisted())
-
-    suspend fun update(ctx: Context, transform: (Persisted) -> Persisted) {
-        mutex.withLock {
-            withContext(Dispatchers.IO) {
-                val tmp = File(ctx.filesDir, "widget_state.json.tmp")
-                tmp.writeText(json.encodeToString(Persisted.serializer(), transform(read(ctx))))
-                tmp.renameTo(file(ctx))
-            }
-        }
-    }
-
-    suspend fun snapshot(ctx: Context): Snapshot = withContext(Dispatchers.IO) {
-        val p = mutex.withLock { read(ctx) }
-        val frames = p.state?.sprite?.let { sp ->
-            (0 until sp.frameCount).mapNotNull { i ->
-                frameFile(ctx, sp.id, i).takeIf { it.exists() }?.let { BitmapFactory.decodeFile(it.path) }
-            }
-        }.orEmpty()
-        Snapshot(
-            configured = Prefs.config(ctx) != null,
-            state = p.state,
-            busy = p.busy,
-            error = p.error,
-            frames = frames,
+    suspend fun snapshot(ctx: Context): Snapshot {
+        val book = Library.active(ctx)
+        return Snapshot(
+            configured = Prefs.groqKey(ctx).isNotBlank(),
+            book = book,
+            busy = book != null && book.error == null && book.next?.ready == false,
+            frames = book?.sprite?.let { sp -> cache.get(sp) ?: crop(Sprites.bitmaps(sp)).also { cache.put(sp, it) } }.orEmpty(),
             animate = Prefs.animate(ctx),
         )
     }
 
-    /** Descarga los frames que falten y borra los de sprites antiguos. */
-    suspend fun ensureFrames(ctx: Context, api: Api, sprite: SpriteInfo?) {
-        if (sprite == null) return
-        withContext(Dispatchers.IO) {
-            sprite.frameUrls.forEachIndexed { i, url ->
-                val f = frameFile(ctx, sprite.id, i)
-                if (!f.exists()) {
-                    val tmp = File(f.path + ".tmp")
-                    tmp.writeBytes(api.image(url))
-                    tmp.renameTo(f)
-                }
+    /** Recorta el margen transparente común a todos los frames (cuadrado), para que el dibujo llene su caja. */
+    private fun crop(frames: List<Bitmap>): List<Bitmap> {
+        if (frames.isEmpty()) return frames
+        val w = frames[0].width
+        val h = frames[0].height
+        var l = w; var t = h; var r = -1; var b = -1
+        val px = IntArray(w * h)
+        for (f in frames) {
+            f.getPixels(px, 0, w, 0, 0, w, h) // de una vez: getPixel uno a uno era lento
+            for (i in px.indices) if ((px[i] ushr 24) != 0) {
+                val x = i % w; val y = i / w
+                if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y
             }
-            framesDir(ctx).listFiles()?.filter { !it.name.startsWith("${sprite.id}_") }?.forEach { it.delete() }
         }
+        if (r < 0) return frames
+        val pad = w / 32 // 1 píxel del dibujo de margen
+        val side = maxOf(r - l, b - t) + 1 + 2 * pad
+        val cx = (l + r) / 2
+        val cy = (t + b) / 2
+        val x0 = (cx - side / 2).coerceIn(0, maxOf(0, w - side))
+        val y0 = (cy - side / 2).coerceIn(0, maxOf(0, h - side))
+        val s = minOf(side, w, h)
+        return frames.map { Bitmap.createBitmap(it, x0, y0, s, s) }
     }
 }

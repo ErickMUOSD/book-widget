@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import com.bookwidget.app.ui.App
@@ -25,13 +26,13 @@ class MainActivity : ComponentActivity() {
                     surface = Color(0xFF181B24),
                 ),
             ) {
-                App(vm)
+                Surface(color = MaterialTheme.colorScheme.background) { App(vm) }
             }
         }
     }
 
     override fun onStart() {
         super.onStart()
-        vm.refreshBooks() // al volver a la app, sincroniza con lo hecho desde el widget o la web
+        vm.reload() // al volver a la app, recoge lo hecho desde el widget
     }
 }

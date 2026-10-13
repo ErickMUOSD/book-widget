@@ -15,3 +15,7 @@ android/build/
 android/app/build/
 android/local.properties
 tsconfig.tsbuildinfo
+
+# PoC: EPUB descargados
+poc/.cache/
+poc/packs/
