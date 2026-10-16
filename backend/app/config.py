@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     chapters_per_block: int = 10
     language: str = "español"
 
+    # Fuentes externas para el índice (orden; vacío = solo Claude). Se consultan antes que Claude
+    # para no inventar capítulos ni fallar el conteo. Solo textos en español (es.wikisource.org).
+    book_sources: str = "wikisource"
+    book_source_timeout: int = 15
+    # Etapa B: fundamentar los pre-spoilers en el texto real del capítulo (solo si hubo fuente).
+    ground_spoilers: bool = True
+    chapters_per_block_grounded: int = 4  # bloque más pequeño cuando se incluye contenido real
+    chapter_text_max_chars: int = 12000  # recorte de seguridad del texto por capítulo antes de resumir
+
 
 @lru_cache
 def get_settings() -> Settings:

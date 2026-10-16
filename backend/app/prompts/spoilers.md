@@ -6,6 +6,7 @@ Reglas generales (aplican a los tres niveles):
 - Habla únicamente de lo que ocurre en el capítulo indicado. No adelantes capítulos posteriores ni reveles el final del libro, identidades secretas, ni quién muere o gana.
 - No uses frases como "spoiler", "en este capítulo" ni números de capítulo. No hagas preguntas retóricas en más de una de las tres leyendas.
 - Basa todo en hechos reales del libro y su índice. Si no recuerdas el contenido de un capítulo, escribe una leyenda atmosférica y genérica coherente con el título y la sinopsis; no inventes tramas concretas.
+- Si junto a un capítulo se te da un «Resumen» (extraído del texto real del libro), basa SUS tres leyendas y SU ficha visual en ese resumen, no en tu memoria: es la fuente de verdad de lo que ocurre. Sigues sin revelar el desenlace al lector.
 
 Niveles:
 - niebla: solo atmósfera y emoción (lugar, clima, sensación). Cero datos de trama.

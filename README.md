@@ -12,9 +12,14 @@ Web (Next.js: /admin + /widget) ┘          (todo en tu servidor local, un dock
 
 ## Qué hace
 
-- **Alta de libro**: título (+ autor). Claude devuelve el índice de capítulos y el género, y se
-  **pregeneran una sola vez** los pre-spoilers de todos los capítulos en 3 niveles
-  (☁️ niebla · 🕯️ pista · 🔥 peligro). Cambiar de capítulo o de nivel después no gasta tokens.
+- **Alta de libro**: título (+ autor). El índice de capítulos se busca primero en **es.wikisource.org**
+  (siguiendo su jerarquía de subpáginas) para obtener el **conteo y los nombres reales** de los capítulos;
+  solo si no está ahí se recurre a Claude. Se **pregeneran una sola vez**
+  los pre-spoilers de todos los capítulos en 3 niveles (☁️ niebla · 🕯️ pista · 🔥 peligro). Cambiar de
+  capítulo o de nivel después no gasta tokens.
+- Cuando el libro vino de una fuente comprobada, los pre-spoilers **y la ficha visual** se fundamentan en
+  el **texto real** del capítulo: una pasada barata lo resume y las leyendas se escriben desde ese resumen
+  (no de la memoria de Claude), evitando inventos.
 - Junto a los pre-spoilers se pregenera una **ficha visual** por capítulo (nudo, desenlace y 3–5 elementos
   dibujables: objetos, animales, lugares, personajes), editable en el panel.
 - **¿En qué capítulo vas?** Eliges el capítulo que terminaste (número o lista con títulos) y se genera un pixel
@@ -30,7 +35,8 @@ Web (Next.js: /admin + /widget) ┘          (todo en tu servidor local, un dock
 
 Por defecto (`CLAUDE_BACKEND=cli`) el backend ejecuta el CLI oficial de Claude Code en modo headless
 (`claude -p --json-schema …`) autenticado con tu suscripción Pro/Max/Team. No se paga por token: cada alta de
-libro (≈ 1 + capítulos/10 llamadas) y cada sprite consumen de los límites de uso de tu plan (ventana de 5 h y semanal).
+libro (confirmación de la fuente + resúmenes y spoilers por bloques; sin fuente, ≈ 1 + capítulos/10 llamadas) y
+cada sprite consumen de los límites de uso de tu plan (ventana de 5 h y semanal).
 
 - **Backend en el host** (`uv run uvicorn …`): basta con tener el CLI instalado y con sesión iniciada
   (`claude auth status`).
@@ -80,7 +86,7 @@ personaje + «Terminé ✓»; 4×2 añade la leyenda sellada.
 ## Desarrollo
 
 ```bash
-# Backend (46 pruebas, sin gastar tokens: usan un Claude falso)
+# Backend (64 pruebas, sin gastar tokens ni red: usan un Claude y fuentes falsas)
 cd backend && uv sync && uv run pytest
 
 # Servidor de desarrollo SIN API key (datos de ejemplo) para probar web y Android

@@ -30,6 +30,9 @@ class Chapter(SQLModel, table=True):
     book_id: int = Field(foreign_key="book.id", index=True)
     number: int
     title: str = ""
+    # Resumen del texto real del capítulo (etapa B, solo si vino de una fuente comprobada).
+    # Fundamenta los pre-spoilers; vacío cuando el índice lo resolvió Claude de memoria.
+    summary: str = ""
 
 
 class Spoiler(SQLModel, table=True):
