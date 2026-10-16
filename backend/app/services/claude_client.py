@@ -67,6 +67,48 @@ INDEX_SCHEMA = {
     "additionalProperties": False,
 }
 
+CONFIRM_SCHEMA = {
+    "type": "object",
+    "properties": {"match": {"type": "boolean"}},
+    "required": ["match"],
+    "additionalProperties": False,
+}
+
+# Solo los capítulos (sin género ni known): estructura un índice ya extraído de una fuente.
+TOC_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "chapters": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"n": {"type": "integer"}, "title": {"type": "string"}},
+                "required": ["n", "title"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["chapters"],
+    "additionalProperties": False,
+}
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summaries": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"chapter": {"type": "integer"}, "summary": {"type": "string"}},
+                "required": ["chapter", "summary"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["summaries"],
+    "additionalProperties": False,
+}
+
 ELEMENT_TYPES = ["objeto", "animal", "criatura", "personaje", "lugar"]
 
 SCENE_SCHEMA = {
@@ -216,8 +258,46 @@ class ClaudeClient:
             user += f"\nSinopsis aportada por el usuario: {synopsis}"
         return self._call(self._params(system=system, user=user, schema=INDEX_SCHEMA, max_tokens=8000))
 
+    # ---------- confirmación / estructura de índice (fuentes externas) ----------
+    def confirm_book(self, title: str, author: str, candidate: str) -> bool:
+        """True si el candidato encontrado en una fuente es la obra pedida."""
+        system = [{"type": "text", "text": _prompt("confirm.md")}]
+        user = (
+            f"Libro buscado:\nTítulo: {title}\nAutor: {author or '(no indicado)'}\n\n"
+            f"Candidato encontrado:\n{candidate}"
+        )
+        res = self._call(self._params(system=system, user=user, schema=CONFIRM_SCHEMA, max_tokens=1000))
+        return bool(res.get("match"))
+
+    def structure_toc(self, title: str, author: str, raw_toc: str, count: int) -> list[dict]:
+        """Limpia y estructura un índice ya extraído de una fuente a [{n, title}] con `count` capítulos."""
+        system = [{"type": "text", "text": _prompt("structure_toc.md", count=count, language=self.settings.language)}]
+        user = (
+            f"Libro: {title}" + (f" — {author}" if author else "")
+            + f"\nNúmero de capítulos: {count}\n\nÍndice extraído de la fuente:\n{raw_toc}"
+        )
+        return self._call(
+            self._params(system=system, user=user, schema=TOC_SCHEMA, max_tokens=8000)
+        ).get("chapters", [])
+
+    def summarize_chapters(self, ctx: BookContext, items: list[tuple[int, str, str]]) -> list[dict]:
+        """Resume el texto real de cada capítulo. `items` = [(n, título, texto), ...]."""
+        system = [{"type": "text", "text": _prompt("summarize.md", language=self.settings.language)}]
+        lines = [f"Libro: {ctx.title}" + (f" — {ctx.author}" if ctx.author else ""), ""]
+        for n, title, text in items:
+            lines.append(f"=== Capítulo {n}" + (f": {title}" if title else "") + " ===")
+            lines.append(text)
+            lines.append("")
+        user = "\n".join(lines)
+        return self._call(
+            self._params(system=system, user=user, schema=SUMMARY_SCHEMA, max_tokens=4000),
+            effort=self.settings.claude_cli_effort,
+        ).get("summaries", [])
+
     # ---------- pre-spoilers ----------
-    def _spoiler_params(self, ctx: BookContext, first: int, last: int) -> dict:
+    def _spoiler_params(
+        self, ctx: BookContext, first: int, last: int, summaries: dict[int, str] | None = None
+    ) -> dict:
         # El prefijo (reglas + contexto del libro) lleva cache_control: los bloques siguientes
         # solo pagan la parte nueva (el rango de capítulos).
         system = [
@@ -227,14 +307,22 @@ class ClaudeClient:
         user = (
             f"Escribe los tres pre-spoilers y la ficha visual de los capítulos {first} al {last} (ambos incluidos)."
         )
+        if summaries:
+            extra = [f"Capítulo {n} — Resumen: {summaries[n]}" for n in range(first, last + 1) if summaries.get(n)]
+            if extra:
+                user += "\n\nResúmenes del texto real (úsalos como fuente de verdad):\n" + "\n".join(extra)
         return self._params(system=system, user=user, schema=self.spoilers_schema, max_tokens=12000)
 
-    def spoilers_sync(self, ctx: BookContext, first: int, last: int) -> list[dict]:
-        return self._call(self._spoiler_params(ctx, first, last)).get("chapters", [])
+    def spoilers_sync(
+        self, ctx: BookContext, first: int, last: int, summaries: dict[int, str] | None = None
+    ) -> list[dict]:
+        return self._call(self._spoiler_params(ctx, first, last, summaries)).get("chapters", [])
 
-    def spoilers_batch_submit(self, ctx: BookContext, blocks: list[tuple[int, int]]) -> str:
+    def spoilers_batch_submit(
+        self, ctx: BookContext, blocks: list[tuple[int, int]], summaries: dict[int, str] | None = None
+    ) -> str:
         reqs = [
-            {"custom_id": f"c{a}-{b}", "params": self._spoiler_params(ctx, a, b)} for a, b in blocks
+            {"custom_id": f"c{a}-{b}", "params": self._spoiler_params(ctx, a, b, summaries)} for a, b in blocks
         ]
         return self.client.messages.batches.create(requests=reqs).id
 

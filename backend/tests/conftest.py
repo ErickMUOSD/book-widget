@@ -15,6 +15,10 @@ def make_client(tmp_path, monkeypatch):
     monkeypatch.setenv("USE_BATCH", "false")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("CLAUDE_BACKEND", "api")  # sin key: el arranque no lanza trabajos reales
+    # Por defecto, sin fuentes externas: resolve_index cae en claude.index (sin red). Los tests de
+    # fundamento (etapa B) monkeypatchean book_sources explícitamente.
+    monkeypatch.setenv("BOOK_SOURCES", "")
+    monkeypatch.setenv("GROUND_SPOILERS", "false")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/test.db")
     get_settings.cache_clear()
     db.init_engine()

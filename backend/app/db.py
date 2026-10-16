@@ -42,7 +42,10 @@ def init_engine(url: str | None = None) -> Engine:
 
 
 # create_all no altera tablas existentes: columnas añadidas después de la primera versión.
-_NEW_COLUMNS = {"sprite": {"subject": "TEXT NOT NULL DEFAULT ''"}}
+_NEW_COLUMNS = {
+    "sprite": {"subject": "TEXT NOT NULL DEFAULT ''"},
+    "chapter": {"summary": "TEXT NOT NULL DEFAULT ''"},
+}
 
 
 def _add_missing_columns(engine: Engine) -> None:

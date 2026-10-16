@@ -19,6 +19,8 @@ from sqlmodel import Session, select
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Book, Chapter, ChapterScene, Spoiler
+from app.services import book_sources
+from app.services.book_sources import SourceRef
 from app.services.claude_client import ELEMENT_TYPES, BookContext, ClaudeClient, get_claude
 from app.services.themes import normalize_genre
 
@@ -182,14 +184,18 @@ def _prepare(s: Session, book: Book, claude: ClaudeClient) -> None:
     book.batch_id = None
     s.commit()
 
-    res = claude.index(book.title, book.author, book.synopsis, hint)
+    # Fuentes externas (Gutenberg, Wikisource) antes que Claude, para no inventar capítulos.
+    res = book_sources.resolve_index(book.title, book.author, book.synopsis, hint, claude)
     titles: dict[int, str] = {}
-    for i, ch in enumerate(sorted(res.get("chapters") or [], key=lambda c: c.get("n", 0)), start=1):
+    for i, ch in enumerate(sorted(res.chapters or [], key=lambda c: c.get("n", 0)), start=1):
         titles[i] = str(ch.get("title") or "").strip()
 
-    if hint:
+    # El conteo de la fuente comprobada manda; el hint del usuario solo cuando no hubo fuente.
+    if res.grounded and titles:
+        total = len(titles)
+    elif hint:
         total = hint
-    elif res.get("known") and titles:
+    elif res.known and titles:
         total = len(titles)
     else:
         book.status = "unknown"
@@ -198,7 +204,7 @@ def _prepare(s: Session, book: Book, claude: ClaudeClient) -> None:
         s.commit()
         return
 
-    book.genre = normalize_genre(res.get("genre"))
+    book.genre = normalize_genre(res.genre)
     book.total_chapters = total
     for n in range(1, total + 1):
         s.add(Chapter(book_id=book.id, number=n, title=titles.get(n, "")))
@@ -206,19 +212,63 @@ def _prepare(s: Session, book: Book, claude: ClaudeClient) -> None:
     s.add(book)
     s.commit()
 
+    # Etapa B: fundamentar los pre-spoilers en el texto real del capítulo (solo si vino de fuente).
+    summaries: dict[int, str] | None = None
+    if res.grounded and settings.ground_spoilers:
+        summaries = _ground_summaries(s, book, claude, res.source_ref, total)
+
+    block_size = settings.chapters_per_block_grounded if summaries else settings.chapters_per_block
     ctx = book_context(s, book)
-    blocks = _blocks(total, settings.chapters_per_block)
+    blocks = _blocks(total, block_size)
     if settings.use_batch and claude.supports_batch:
-        book.batch_id = claude.spoilers_batch_submit(ctx, blocks)
+        book.batch_id = claude.spoilers_batch_submit(ctx, blocks, summaries)
         s.add(book)
         s.commit()  # lo cierra poll_batches()
         return
     for a, b in blocks:
         try:
-            _save_items(s, book, claude.spoilers_sync(ctx, a, b), set(range(a, b + 1)))
+            _save_items(s, book, claude.spoilers_sync(ctx, a, b, summaries), set(range(a, b + 1)))
         except Exception as e:  # noqa: BLE001
             log.warning("bloque %s-%s falló: %s", a, b, e)
     _finalize(s, book, claude)
+
+
+def _ground_summaries(
+    s: Session, book: Book, claude: ClaudeClient, source_ref: SourceRef | None, total: int
+) -> dict[int, str] | None:
+    """Recupera el texto real por capítulo y lo resume en bloques pequeños; persiste en Chapter.summary.
+    Best-effort: si algo falla, devuelve lo que haya (o None) y el flujo sigue sin fundamento."""
+    try:
+        texts = book_sources.chapter_texts(source_ref)
+    except Exception as e:  # noqa: BLE001
+        log.warning("recuperación de texto del libro %s falló: %s", book.id, e)
+        return None
+    if not texts:
+        return None
+    settings = get_settings()
+    rows = {c.number: c for c in s.exec(select(Chapter).where(Chapter.book_id == book.id)).all()}
+    ctx = book_context(s, book)
+    summaries: dict[int, str] = {}
+    nums = sorted(n for n in texts if n in rows)
+    size = max(1, settings.chapters_per_block_grounded)
+    for i in range(0, len(nums), size):
+        chunk = nums[i : i + size]
+        items = [(n, rows[n].title, texts[n]) for n in chunk]
+        try:
+            out = claude.summarize_chapters(ctx, items)
+        except Exception as e:  # noqa: BLE001
+            log.warning("resumen de capítulos %s (libro %s) falló: %s", chunk, book.id, e)
+            continue
+        for item in out or []:
+            n = item.get("chapter")
+            text = str(item.get("summary") or "").strip()
+            if isinstance(n, int) and text and n in rows:
+                rows[n].summary = text
+                summaries[n] = text
+    for row in rows.values():
+        s.add(row)
+    s.commit()
+    return summaries or None
 
 
 def poll_batches(claude: ClaudeClient | None = None) -> None:

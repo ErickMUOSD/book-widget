@@ -17,15 +17,20 @@ def good_sprite(name="Bibliotecario", frames=True) -> dict:
 class FakeClaude(ClaudeClient):
     """Sustituye todas las llamadas a la API y cuenta cuántas se hacen."""
 
-    def __init__(self, total=25, known=True, genre="fantasía", bad_words_for=(), sprite_outputs=None):
+    def __init__(self, total=25, known=True, genre="fantasía", bad_words_for=(), sprite_outputs=None,
+                 confirm_result=True):
         self.total, self.known, self.genre = total, known, genre
         self.bad_words_for = set(bad_words_for)  # capítulos cuya primera leyenda excede 50 palabras
         self.sprite_outputs = list(sprite_outputs or [])
-        self.calls = {"index": 0, "sync": 0, "submit": 0, "collect": 0, "sprite": 0}
+        self.confirm_result = confirm_result
+        self.calls = {"index": 0, "sync": 0, "submit": 0, "collect": 0, "sprite": 0,
+                      "confirm": 0, "structure": 0, "summarize": 0}
         self.sprite_prompts: list[dict] = []
         self.batches: dict[str, list[tuple[int, int]]] = {}
         self.batch_state = "in_progress"
         self.sync_attempts: dict[int, int] = {}
+        self.summarized: list[list[int]] = []  # bloques de capítulos resumidos
+        self.spoiler_summaries: list[dict | None] = []  # resúmenes recibidos en cada llamada de spoilers
 
     def _items(self, first, last, first_pass=True):
         out = []
@@ -55,14 +60,29 @@ class FakeClaude(ClaudeClient):
         return {"known": True, "genre": self.genre,
                 "chapters": [{"n": i, "title": f"Cap {i}"} for i in range(1, self.total + 1)]}
 
-    def spoilers_sync(self, ctx: BookContext, first, last):
+    def confirm_book(self, title, author, candidate):
+        self.calls["confirm"] += 1
+        return self.confirm_result
+
+    def structure_toc(self, title, author, raw_toc, count):
+        self.calls["structure"] += 1
+        return [{"n": i, "title": f"Nombre real {i}"} for i in range(1, count + 1)]
+
+    def summarize_chapters(self, ctx: BookContext, items):
+        self.calls["summarize"] += 1
+        self.summarized.append([n for n, _, _ in items])
+        return [{"chapter": n, "summary": f"Resumen real del capítulo {n}"} for n, _, _ in items]
+
+    def spoilers_sync(self, ctx: BookContext, first, last, summaries=None):
         self.calls["sync"] += 1
+        self.spoiler_summaries.append(summaries)
         retry = self.sync_attempts.get(first, 0) > 0
         self.sync_attempts[first] = self.sync_attempts.get(first, 0) + 1
         return self._items(first, last, first_pass=not retry)
 
-    def spoilers_batch_submit(self, ctx, blocks):
+    def spoilers_batch_submit(self, ctx, blocks, summaries=None):
         self.calls["submit"] += 1
+        self.spoiler_summaries.append(summaries)
         bid = f"batch_{self.calls['submit']}"
         self.batches[bid] = blocks
         return bid
