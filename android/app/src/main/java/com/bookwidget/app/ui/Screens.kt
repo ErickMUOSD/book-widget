@@ -36,12 +36,15 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -121,10 +125,10 @@ fun SetupScreen(vm: AppViewModel) {
 
 // ---------------------------------------------------------------- libros
 private fun statusLabel(b: BookSummary) = when (b.status) {
-    "ready" -> "LISTO · cap. ${b.currentChapter}/${b.totalChapters}"
-    "pending" -> "PREPARANDO…"
-    "unknown" -> "NECESITA DATOS (usa el panel web)"
-    else -> b.statusDetail.ifBlank { "ERROR" }.uppercase()
+    "ready" -> "Listo · cap. ${b.currentChapter}/${b.totalChapters}"
+    "pending" -> "Preparando…"
+    "unknown" -> "Necesita datos (usa el panel web)"
+    else -> b.statusDetail.ifBlank { "Error" }
 }
 
 @Composable
@@ -158,15 +162,15 @@ fun BooksScreen(vm: AppViewModel) {
 private fun BookRow(vm: AppViewModel, b: BookSummary) {
     val border = hex(b.theme.border, Retro.Line)
     RetroPanel(Modifier.fillMaxWidth().clickable { vm.openBook(b.id) }, border = border) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                PixelText(b.title, size = 9.sp, modifier = Modifier.weight(1f))
-                if (b.isActive) Tag("EN EL WIDGET", color = Retro.Accent2)
+                Text(b.title, fontWeight = FontWeight.Bold, color = Retro.Text, modifier = Modifier.weight(1f))
+                if (b.isActive) Text("en el widget", fontSize = 11.sp, color = border)
             }
             Text("${b.author.ifBlank { "—" }} · ${b.theme.name}", fontSize = 12.sp, color = Retro.Muted)
-            PixelText(statusLabel(b), size = 7.sp, color = if (b.status == "ready") Retro.Accent2 else Retro.Muted)
+            Text(statusLabel(b), fontSize = 13.sp, color = if (b.status == "ready") Retro.Accent2 else Retro.Muted)
             if (b.status == "ready" && !b.isActive) {
-                RetroButton("Usar en el widget", { vm.activate(b.id) }, outline = true, color = border)
+                TextButton(onClick = { vm.activate(b.id) }) { Text("Usar en el widget") }
             }
         }
     }
@@ -242,11 +246,11 @@ fun BookScreen(vm: AppViewModel) {
         fun label(n: Int) = if (n == 0) "0 — Aún no empiezo" else "$n — ${titles[n]?.ifBlank { null } ?: "Capítulo $n"}"
         RetroPanel(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PixelText("¿EN QUÉ CAPÍTULO VAS?", size = 9.sp, color = Retro.Accent2)
+                Text("¿En qué capítulo vas?", fontWeight = FontWeight.Bold, color = Retro.Text)
                 Text("Terminé el capítulo", fontSize = 13.sp, color = Retro.Muted)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     RetroIconButton(Icons.Sharp.Remove, "Uno menos", { chapter = (chapter - 1).coerceAtLeast(0) })
-                    PixelText("$chapter / ${s.totalChapters}", size = 13.sp)
+                    Text("$chapter / ${s.totalChapters}", fontSize = 18.sp, color = Retro.Text)
                     RetroIconButton(Icons.Sharp.Add, "Uno más", { chapter = (chapter + 1).coerceAtMost(s.totalChapters) })
                 }
                 ChapterDropdown(
@@ -269,9 +273,15 @@ fun BookScreen(vm: AppViewModel) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            RetroButton("Nuevo", { vm.regenerate() }, enabled = vm.working == null, icon = Icons.Sharp.Casino, outline = true)
-            RetroButton("Sellada", { vm.share(true) }, enabled = vm.working == null, icon = Icons.Sharp.Share, outline = true)
-            RetroButton("Revelada", { vm.share(false) }, enabled = vm.working == null, icon = Icons.Sharp.Share, outline = true)
+            OutlinedButton(onClick = { vm.regenerate() }, enabled = vm.working == null) {
+                Icon(Icons.Sharp.Casino, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Nuevo")
+            }
+            OutlinedButton(onClick = { vm.share(true) }, enabled = vm.working == null) {
+                Icon(Icons.Sharp.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Sellada")
+            }
+            OutlinedButton(onClick = { vm.share(false) }, enabled = vm.working == null) {
+                Icon(Icons.Sharp.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Revelada")
+            }
         }
         vm.working?.let {
             Row(verticalAlignment = Alignment.CenterVertically) {
