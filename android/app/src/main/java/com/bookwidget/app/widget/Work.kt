@@ -28,6 +28,12 @@ object Work {
     const val OP_REFRESH = "refresh"
     const val OP_ADVANCE = "advance"
     const val OP_UNSEAL = "unseal"
+    const val OP_SETLEVEL = "setlevel"
+
+    /** Repinta el widget desde la caché local (sin red). Lo usa el receptor de «app actualizada». */
+    suspend fun refreshWidget(ctx: Context) {
+        BookWidget().updateAll(ctx)
+    }
 
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
@@ -82,6 +88,12 @@ class WidgetWorker(private val ctx: Context, params: WorkerParameters) : Corouti
                 Work.OP_UNSEAL -> {
                     val id = WidgetStore.snapshot(ctx).state?.bookId ?: return Result.success()
                     api.patchState(id, sealed = false)
+                }
+                Work.OP_SETLEVEL -> {
+                    // el nivel ya se guardó (optimista) al tocar; se lo mandamos al servidor y
+                    // aplicamos la respuesta (cambia la leyenda del próximo capítulo según el nivel).
+                    val s = WidgetStore.snapshot(ctx).state ?: return Result.success()
+                    Sync.apply(ctx, api, api.patchState(s.bookId, level = s.spoilerLevel))
                 }
                 else -> api.widget()?.let { Sync.apply(ctx, api, it) }
             }

@@ -7,9 +7,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.ui.graphics.Color
 import com.bookwidget.app.ui.App
 import com.bookwidget.app.ui.AppViewModel
+import com.bookwidget.app.ui.Retro
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -20,9 +20,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF8B7BFF),
-                    background = Color(0xFF0F1117),
-                    surface = Color(0xFF181B24),
+                    primary = Retro.Accent,
+                    secondary = Retro.Accent2,
+                    background = Retro.Bg,
+                    surface = Retro.Panel,
+                    error = Retro.Danger,
                 ),
             ) {
                 App(vm)

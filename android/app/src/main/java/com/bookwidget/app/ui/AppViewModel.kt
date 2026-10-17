@@ -90,7 +90,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setAnimate(value: Boolean) {
+    // Nombre distinto del setter de la propiedad `animate` (mismo setAnimate(Z)V -> choque en la JVM).
+    fun toggleAnimate(value: Boolean) {
         animate = value
         viewModelScope.launch {
             Prefs.setAnimate(ctx, value)

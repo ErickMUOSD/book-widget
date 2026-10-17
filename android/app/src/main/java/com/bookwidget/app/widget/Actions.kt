@@ -17,12 +17,27 @@ class BreakSealAction : ActionCallback {
     }
 }
 
-/** «Terminé ✓»: capítulo + 1 sin abrir la app. Muestra «invocando…» hasta que llega el nuevo personaje. */
+/** «Terminé ✓»: capítulo + 1 sin abrir la app. Muestra «PROCESANDO…» hasta que llega el nuevo personaje. */
 class AdvanceChapterAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         WidgetStore.update(context) { it.copy(busy = true, error = null) }
         BookWidget().updateAll(context)
         // KEEP: un doble toque no avanza dos capítulos
         Work.enqueue(context, Work.OP_ADVANCE, unique = "advance", policy = ExistingWorkPolicy.KEEP)
+    }
+}
+
+/** Niebla · Pista · Peligro: resalta al instante el nivel elegido y pide al servidor la leyenda de ese nivel. */
+class SetLevelAction : ActionCallback {
+    companion object {
+        val LEVEL = ActionParameters.Key<String>("level")
+    }
+
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val level = parameters[LEVEL] ?: return
+        WidgetStore.update(context) { p -> p.copy(state = p.state?.copy(spoilerLevel = level)) }
+        BookWidget().updateAll(context)
+        // REPLACE: si se toca otro nivel enseguida, gana el último (el store ya guarda el elegido).
+        Work.enqueue(context, Work.OP_SETLEVEL, unique = "setlevel")
     }
 }
