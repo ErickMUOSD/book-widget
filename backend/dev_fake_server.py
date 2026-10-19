@@ -5,6 +5,8 @@ Sirve para probar la app Android y la web sin gastar tokens.
 """
 import os
 
+
+
 # Servidor offline: sin fuentes externas (no toca la red) ni etapa B; todo lo resuelve el Claude falso.
 os.environ.setdefault("BOOK_SOURCES", "")
 os.environ.setdefault("GROUND_SPOILERS", "false")
