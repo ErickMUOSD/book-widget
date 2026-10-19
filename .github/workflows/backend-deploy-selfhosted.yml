@@ -11,7 +11,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - run: |
-          cd /home/ocelops/Documents/home-server/book-widget/backend
+          cd /var/book-widget/backend
           git fetch origin main
           git reset --hard origin/main
           docker compose up -d --force-recreate --build backend

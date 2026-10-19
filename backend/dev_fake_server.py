@@ -7,6 +7,7 @@ import os
 
 
 
+
 # Servidor offline: sin fuentes externas (no toca la red) ni etapa B; todo lo resuelve el Claude falso.
 os.environ.setdefault("BOOK_SOURCES", "")
 os.environ.setdefault("GROUND_SPOILERS", "false")
