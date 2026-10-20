@@ -5,4 +5,6 @@ const config: NextConfig = {
   poweredByHeader: false,
 };
 
+
+
 export default config;
