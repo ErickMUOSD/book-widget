@@ -1,107 +1,121 @@
 # Book Widget
 
-Un personaje pixel art pequeño y divertido, inspirado en el libro que lees, con una leyenda misteriosa
-(≤ 50 palabras) que **pre-spoilea el siguiente capítulo**. Vive en la pantalla de inicio de Android (widget)
-o flotando sobre tu escritorio (web), sin notificaciones.
+## Purpose
+
+Book Widget exists to make reading a book something you look forward to returning to. A small, playful pixel-art
+character — inspired by the book you are currently reading — lives on your Android home screen (as a widget) or
+floats over your desktop (on the web). It carries a short, mysterious caption (≤ 50 words) that **pre-spoils the
+next chapter**, just enough to pull you forward without giving the story away.
+
+The goal is to turn an unfinished book into a gentle, recurring invitation. Rather than nagging you with
+notifications, the widget sits quietly in view and rewards each chapter you finish with a new drawing and a new
+hint about what comes next. Curiosity does the work: you keep reading to find out what the next sealed caption
+means, and to see the next piece of pixel art appear.
+
+Every hint is anchored in the **real text** of the book, not improvised, so the character stays faithful to the
+story and the nudges feel earned. In short, Book Widget is a quiet companion that keeps the next chapter
+tantalizingly close and makes steady reading its own small reward.
+
+## Architecture
 
 ```
-Android (app + widget Glance) ──┐
-                                ├──> FastAPI + SQLite ──> Claude (CLI con tu suscripción, o API key)
-Web (Next.js: /admin + /widget) ┘          (todo en tu servidor local, un docker-compose)
+Android (app + Glance widget) ──┐
+                                ├──> FastAPI + SQLite ──> Claude (CLI with your subscription, or API key)
+Web (Next.js: /admin + /widget) ┘          (everything on your own local server, one docker-compose)
 ```
 
-## Qué hace
+## What it does
 
-- **Alta de libro**: título (+ autor). El índice de capítulos se busca primero en **es.wikisource.org**
-  (siguiendo su jerarquía de subpáginas) para obtener el **conteo y los nombres reales** de los capítulos;
-  solo si no está ahí se recurre a Claude. Se **pregeneran una sola vez**
-  los pre-spoilers de todos los capítulos en 3 niveles (☁️ niebla · 🕯️ pista · 🔥 peligro). Cambiar de
-  capítulo o de nivel después no gasta tokens.
-- Cuando el libro vino de una fuente comprobada, los pre-spoilers **y la ficha visual** se fundamentan en
-  el **texto real** del capítulo: una pasada barata lo resume y las leyendas se escriben desde ese resumen
-  (no de la memoria de Claude), evitando inventos.
-- Junto a los pre-spoilers se pregenera una **ficha visual** por capítulo (nudo, desenlace y 3–5 elementos
-  dibujables: objetos, animales, lugares, personajes), editable en el panel.
-- **¿En qué capítulo vas?** Eliges el capítulo que terminaste (número o lista con títulos) y se genera un pixel
-  art del **capítulo siguiente**: un elemento de su ficha, distinto de los ya dibujados (32×32, hasta 16 colores,
-  2–3 frames de animación idle, estilo orgánico con luz y sombras).
-- **Leyenda sellada**: el widget la muestra cifrada hasta que pulsas «Romper sello».
-- **Terminé ✓** en el widget avanza el capítulo sin abrir la app.
-- **Compartir** una tarjeta PNG (sellada o revelada) · **tema por género** (colores y paleta del personaje).
-- Optimización de tokens: bloques de 10 capítulos por llamada, caché global por libro y reintento solo de lo
-  inválido; con API key, además, prompt caching del contexto del libro y Message Batches API (−50 %).
+- **Adding a book**: title (and author). The chapter index is first looked up on **es.wikisource.org**
+  (following its subpage hierarchy) to obtain the **real chapter count and names**; Claude is only used as a
+  fallback when the book is not available there. The pre-spoilers for every chapter are **generated once** at
+  three intensity levels (☁️ fog · 🕯️ hint · 🔥 danger). Switching chapters or levels afterward costs no tokens.
+- When a book comes from a verified source, the pre-spoilers **and the visual sheet** are grounded in the
+  **real chapter text**: a cheap pass summarizes it, and the captions are written from that summary (not from
+  Claude's memory), avoiding fabrication.
+- Alongside the pre-spoilers, a **visual sheet** is pre-generated per chapter (the turning point, the resolution,
+  and 3–5 drawable elements: objects, animals, places, characters), editable in the admin panel.
+- **Which chapter are you on?** You select the chapter you just finished (by number, or from a list with titles)
+  and pixel art for the **next chapter** is generated: one element from its sheet, different from those already
+  drawn (32×32, up to 16 colors, 2–3 idle animation frames, organic style with light and shadow).
+- **Sealed caption**: the widget shows the caption encrypted until you tap "Break the seal."
+- **Done ✓** on the widget advances the chapter without opening the app.
+- **Share** a PNG card (sealed or revealed) · **theme by genre** (colors and character palette).
+- Token optimization: blocks of 10 chapters per call, a global per-book cache, and retrying only what is
+  invalid; with an API key, additionally prompt caching of the book context and the Message Batches API (−50%).
 
-## Claude sin API key (suscripción)
+## Claude without an API key (subscription)
 
-Por defecto (`CLAUDE_BACKEND=cli`) el backend ejecuta el CLI oficial de Claude Code en modo headless
-(`claude -p --json-schema …`) autenticado con tu suscripción Pro/Max/Team. No se paga por token: cada alta de
-libro (confirmación de la fuente + resúmenes y spoilers por bloques; sin fuente, ≈ 1 + capítulos/10 llamadas) y
-cada sprite consumen de los límites de uso de tu plan (ventana de 5 h y semanal).
+By default (`CLAUDE_BACKEND=cli`) the backend runs the official Claude Code CLI in headless mode
+(`claude -p --json-schema …`), authenticated with your Pro/Max/Team subscription. There is no per-token charge:
+each book added (source confirmation + summaries and spoilers in blocks; without a source, ≈ 1 + chapters/10
+calls) and each sprite draw from your plan's usage limits (5-hour and weekly windows).
 
-- **Backend en el host** (`uv run uvicorn …`): basta con tener el CLI instalado y con sesión iniciada
+- **Backend on the host** (`uv run uvicorn …`): you only need the CLI installed and signed in
   (`claude auth status`).
-- **Backend en Docker**: la imagen ya trae el CLI. Genera un token de 1 año con `claude setup-token` (abre el
-  navegador) y ponlo en `backend/.env` como `CLAUDE_CODE_OAUTH_TOKEN=…`.
-- Úsalo para ti: los términos de Anthropic no permiten ofrecer el acceso de tu suscripción a otros usuarios en un
-  producto propio. Si abres el widget a más gente, pasa a `CLAUDE_BACKEND=api` con `ANTHROPIC_API_KEY`.
-- El modo `cli` ignora `USE_BATCH` (la Batches API solo existe con API key) y quita `ANTHROPIC_API_KEY` del
-  entorno del CLI para que no tape tu login.
-- Tiempos medidos (Sonnet, `CLAUDE_CLI_EFFORT=low`): alta de un libro de 3 capítulos ≈ 30 s; cada sprite
-  ≈ 30–50 s (el cambio de capítulo espera al sprite). Con el esfuerzo por defecto del CLI el dibujo es más
-  detallado, pero un sprite tardó ~3,5 min.
+- **Backend in Docker**: the image already includes the CLI. Generate a 1-year token with `claude setup-token`
+  (opens the browser) and set it in `backend/.env` as `CLAUDE_CODE_OAUTH_TOKEN=…`.
+- For personal use only: Anthropic's terms do not allow offering your subscription's access to other users in a
+  product of your own. If you open the widget to more people, switch to `CLAUDE_BACKEND=api` with
+  `ANTHROPIC_API_KEY`.
+- The `cli` mode ignores `USE_BATCH` (the Batches API only exists with an API key) and removes
+  `ANTHROPIC_API_KEY` from the CLI's environment so it does not override your login.
+- Measured times (Sonnet, `CLAUDE_CLI_EFFORT=low`): adding a 3-chapter book ≈ 30 s; each sprite ≈ 30–50 s
+  (the chapter change waits for the sprite). With the CLI's default effort the drawing is more detailed, but one
+  sprite took ~3.5 min.
 
-## Puesta en marcha (servidor local)
+## Quick setup (local server)
 
 ```bash
-cp backend/.env.example backend/.env   # CLAUDE_CODE_OAUTH_TOKEN (o ANTHROPIC_API_KEY) y ADMIN_TOKEN
-cp web/.env.example web/.env           # mismo ADMIN_TOKEN, ADMIN_PASSWORD y SESSION_SECRET (≥ 32 caracteres)
+cp backend/.env.example backend/.env   # CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_API_KEY) and ADMIN_TOKEN
+cp web/.env.example web/.env           # same ADMIN_TOKEN, ADMIN_PASSWORD and SESSION_SECRET (≥ 32 characters)
 docker compose up -d --build
 ```
 
-- Panel web: <http://localhost:3000> (entra con `ADMIN_PASSWORD`).
-- API: <http://localhost:8000> (la app Android habla directamente con ella).
-- En **Ajustes → Dispositivos** crea un token por dispositivo (se muestra una sola vez).
+- Web panel: <http://localhost:3000> (sign in with `ADMIN_PASSWORD`).
+- API: <http://localhost:8000> (the Android app talks to it directly).
+- In **Settings → Devices**, create a per-device token (shown only once).
 
-### Widget flotante en el escritorio
+### Floating desktop widget
 
-`/widget` → «Anclar encima de todo» usa Document Picture-in-Picture (Chrome/Edge ≥ 116) y **solo funciona
-sobre HTTPS o `localhost`**. Para usarlo desde otro equipo de la red, sirve el panel por HTTPS
-(p. ej. `tailscale serve` o Caddy). Sin soporte PiP (Firefox/Safari) hay dos alternativas: instalar `/widget`
-como app (PWA) o activar el widget flotante dentro del panel en Ajustes.
+`/widget` → "Pin above everything" uses Document Picture-in-Picture (Chrome/Edge ≥ 116) and **only works over
+HTTPS or `localhost`**. To use it from another machine on the network, serve the panel over HTTPS (e.g.
+`tailscale serve` or Caddy). Without PiP support (Firefox/Safari) there are two alternatives: install `/widget`
+as an app (PWA) or enable the floating widget inside the panel under Settings.
 
-### App Android
+### Android app
 
-Necesita Android Studio (o el SDK de Android + JDK 17+):
+Requires Android Studio (or the Android SDK + JDK 17+):
 
 ```bash
 cd android && ./gradlew installDebug
 ```
 
-Abre la app, escribe la URL del servidor (`http://IP-DE-TU-SERVIDOR:8000`) y el token del dispositivo, y añade
-el widget desde la pantalla de inicio (mantener pulsado → Widgets → Book Widget). Redimensionable: 2×2 muestra
-personaje + «Terminé ✓»; 4×2 añade la leyenda sellada.
+Open the app, enter the server URL (`http://YOUR-SERVER-IP:8000`) and the device token, then add the widget from
+the home screen (long-press → Widgets → Book Widget). Resizable: 2×2 shows the character + "Done ✓"; 4×2 also
+adds the sealed caption.
 
-> La app permite HTTP porque tu servidor está en una IP privada. Fuera de casa usa Tailscale (con HTTPS).
+> The app allows HTTP because your server is on a private IP. Away from home, use Tailscale (with HTTPS).
 
-## Desarrollo
+## Development
 
 ```bash
-# Backend (64 pruebas, sin gastar tokens ni red: usan un Claude y fuentes falsas)
+# Backend (64 tests, no token or network usage: they use a fake Claude and fake sources)
 cd backend && uv sync && uv run pytest
 
-# Servidor de desarrollo SIN API key (datos de ejemplo) para probar web y Android
+# Development server WITHOUT an API key (sample data) to test web and Android
 ADMIN_TOKEN=dev USE_BATCH=false uv run uvicorn dev_fake_server:app --port 8000
 
 # Web
 cd web && npm install && npm run lint && npm run build
 ```
 
-## Estructura
+## Structure
 
 ```
-backend/   FastAPI · sqlmodel · anthropic/CLI claude · Pillow  (app/services = Claude, pregeneración, sprites, tarjetas)
-web/       Next.js 16 + Tailwind · BFF /api/* → FastAPI (el token maestro nunca llega al navegador)
+backend/   FastAPI · sqlmodel · anthropic/CLI claude · Pillow  (app/services = Claude, pre-generation, sprites, cards)
+web/       Next.js 16 + Tailwind · BFF /api/* → FastAPI (the master token never reaches the browser)
 android/   Kotlin · Compose · Glance (widget) · WorkManager
 ```
 
-La fuente pixel de las tarjetas es *Press Start 2P* (SIL OFL 1.1).
+The pixel font used on the cards is *Press Start 2P* (SIL OFL 1.1).
