@@ -330,7 +330,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 Text("Animación del personaje")
                 Text("Desactívala para ahorrar batería.", fontSize = 12.sp, color = Color.Gray)
             }
-            Switch(checked = vm.animate, onCheckedChange = { vm.setAnimate(it) })
+            Switch(checked = vm.animate, onCheckedChange = { vm.updateAnimate(it) })
         }
         Text("Servidor: ${vm.config?.baseUrl.orEmpty()}", fontSize = 13.sp)
         Text(
