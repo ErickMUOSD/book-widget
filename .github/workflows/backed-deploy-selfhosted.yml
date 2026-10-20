@@ -1,0 +1,17 @@
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+jobs:
+  deploy-backend:
+    runs-on: [self-hosted]
+    concurrency:
+      group: default
+      cancel-in-progress: false
+    steps:
+      - run: |
+          cd /var/book-widget/web
+          git fetch origin main
+          git reset --hard origin/main
+          docker compose up -d --force-recreate --build web
