@@ -90,7 +90,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setAnimate(value: Boolean) {
+    fun updateAnimate(value: Boolean) {
         animate = value
         viewModelScope.launch {
             Prefs.setAnimate(ctx, value)
