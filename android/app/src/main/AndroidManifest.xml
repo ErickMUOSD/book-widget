@@ -32,6 +32,14 @@
                 android:resource="@xml/book_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.PackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -43,6 +43,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var frames by mutableStateOf<List<ImageBitmap>>(emptyList()); private set
     var working by mutableStateOf<String?>(null); private set
     var error by mutableStateOf<String?>(null)
+    /** null = sin comprobar todavía · true = servidor alcanzable · false = inalcanzable. */
+    var connected by mutableStateOf<Boolean?>(null); private set
 
     init {
         viewModelScope.launch {
@@ -65,12 +67,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 candidate.verify()
             } catch (e: Throwable) {
+                connected = false
                 onDone(e.friendly())
                 return@launch
             }
             Prefs.saveConfig(ctx, normalized, token)
             config = Config(normalized, token.trim())
             api = candidate
+            connected = true
             screen = Screen.Books
             Work.schedulePeriodic(ctx)
             refreshBooks()
@@ -105,9 +109,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 books = a.books()
                 error = null
+                connected = true
             } catch (e: Throwable) {
                 error = e.friendly()
+                connected = false
             }
+        }
+    }
+
+    /** Barra de estado: reintenta la conexión y, si vuelve, repinta el widget con lo último del servidor. */
+    fun retryConnection() {
+        val a = api ?: return
+        viewModelScope.launch {
+            connected = null // «comprobando…»
+            try {
+                books = a.books()
+                a.widget()?.let { Sync.apply(ctx, a, it) }
+                error = null
+                connected = true
+            } catch (e: Throwable) {
+                error = e.friendly()
+                connected = false
+            }
+        }
+    }
+
+    /** Pestaña «Mi libro»: abre el libro activo (el del widget) o deja un estado vacío si no hay ninguno. */
+    fun openMyBook() {
+        val active = books.firstOrNull { it.isActive }?.id
+        if (active != null) {
+            openBook(active)
+        } else {
+            current = null
+            frames = emptyList()
+            chapters = emptyList()
+            screen = Screen.Book(-1)
         }
     }
 

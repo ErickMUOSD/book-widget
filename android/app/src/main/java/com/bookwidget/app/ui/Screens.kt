@@ -33,11 +33,15 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,16 +71,85 @@ private fun themeColor(hex: String, fallback: Long): Color =
 
 @Composable
 fun App(vm: AppViewModel) {
-    BackHandler(enabled = vm.screen != Screen.Books) { vm.screen = Screen.Books }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
         when {
             !vm.loaded -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             vm.config == null -> SetupScreen(vm)
-            else -> when (val s = vm.screen) {
-                Screen.Books -> BooksScreen(vm)
-                is Screen.Book -> BookScreen(vm)
-                Screen.Settings -> SettingsScreen(vm)
+            else -> MainScaffold(vm)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainScaffold(vm: AppViewModel) {
+    BackHandler(enabled = vm.screen != Screen.Books) { vm.screen = Screen.Books }
+    Scaffold(
+        topBar = {
+            TopAppBar(title = {
+                Text("📖 Book Widget", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            })
+        },
+        bottomBar = { BottomNav(vm) },
+    ) { inner ->
+        Column(Modifier.padding(inner).fillMaxSize()) {
+            ConnectionBar(vm)
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (vm.screen) {
+                    Screen.Books -> BooksScreen(vm)
+                    is Screen.Book -> BookScreen(vm)
+                    Screen.Settings -> SettingsScreen(vm)
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun BottomNav(vm: AppViewModel) {
+    val screen = vm.screen
+    NavigationBar {
+        NavigationBarItem(
+            selected = screen is Screen.Books,
+            onClick = { vm.screen = Screen.Books },
+            icon = { Text("📚") },
+            label = { Text("Libros") },
+        )
+        NavigationBarItem(
+            selected = screen is Screen.Book,
+            onClick = { vm.openMyBook() },
+            icon = { Text("📖") },
+            label = { Text("Mi libro") },
+        )
+        NavigationBarItem(
+            selected = screen is Screen.Settings,
+            onClick = { vm.screen = Screen.Settings },
+            icon = { Text("⚙️") },
+            label = { Text("Ajustes") },
+        )
+    }
+}
+
+/** Barra bajo el top bar: estado real de conexión con el servidor (probe), con «Reintentar» manual. */
+@Composable
+private fun ConnectionBar(vm: AppViewModel) {
+    val (bg, fg, label) = when (vm.connected) {
+        true -> Triple(Color(0xFF14532D), Color(0xFFBBF7D0), "● Conectado")
+        false -> Triple(Color(0xFF7F1D1D), Color(0xFFFECACA), "● Desconectado")
+        null -> Triple(Color(0xFF374151), Color(0xFFD1D5DB), "○ Comprobando…")
+    }
+    Row(
+        Modifier.fillMaxWidth().background(bg).padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (vm.connected == false) {
+                vm.error?.let { Text(it, color = fg, fontSize = 11.sp) }
+            }
+        }
+        if (vm.connected == false) {
+            TextButton(onClick = { vm.retryConnection() }) { Text("Reintentar", color = fg) }
         }
     }
 }
@@ -134,12 +207,7 @@ fun BooksScreen(vm: AppViewModel) {
         }
     }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("📖 Mis libros", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = { vm.screen = Screen.Settings }) { Text("Ajustes") }
-        }
-        vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 6.dp)) }
+        Text("Mis libros", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
         if (vm.books.isEmpty()) {
             Text("Aún no hay libros. Añade el primero.", modifier = Modifier.padding(vertical = 24.dp))
         }
@@ -222,9 +290,15 @@ private fun AddBookDialog(vm: AppViewModel, onClose: () -> Unit) {
 fun BookScreen(vm: AppViewModel) {
     val s = vm.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        TextButton(onClick = { vm.screen = Screen.Books }) { Text("← Libros") }
         if (s == null) {
-            vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error) } ?: CircularProgressIndicator()
+            when {
+                vm.error != null -> Text(vm.error!!, color = MaterialTheme.colorScheme.error)
+                vm.books.any { it.isActive } -> CircularProgressIndicator() // cargando el libro activo
+                else -> Text(
+                    "Aún no tienes un libro en el widget.\nElige uno en «Libros» y pulsa «Usar en el widget».",
+                    textAlign = TextAlign.Center, color = Color.Gray, modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                )
+            }
             return@Column
         }
         if (s.status != "ready") {
@@ -323,7 +397,6 @@ private fun PreviewCard(vm: AppViewModel, s: WidgetState) {
 @Composable
 fun SettingsScreen(vm: AppViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        TextButton(onClick = { vm.screen = Screen.Books }) { Text("← Libros") }
         Text("Ajustes", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

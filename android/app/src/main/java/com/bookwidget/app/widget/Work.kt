@@ -28,13 +28,30 @@ object Work {
     const val OP_REFRESH = "refresh"
     const val OP_ADVANCE = "advance"
     const val OP_UNSEAL = "unseal"
+    const val OP_SETLEVEL = "setlevel"
+
+    /** Repinta el widget desde la caché local (sin red). Lo usa el receptor de «app actualizada». */
+    suspend fun refreshWidget(ctx: Context) {
+        BookWidget().updateAll(ctx)
+    }
 
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
-    fun enqueue(ctx: Context, op: String, unique: String, policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE) {
+    /**
+     * [requireNetwork] en false para acciones del usuario (avanzar, romper sello, cambiar nivel): así el worker
+     * corre al instante y falla rápido con un error visible, en vez de quedarse encolado —y el widget
+     * atascado en «PROCESANDO…»— cuando no hay red o el servidor LAN es inalcanzable.
+     */
+    fun enqueue(
+        ctx: Context,
+        op: String,
+        unique: String,
+        policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
+        requireNetwork: Boolean = true,
+    ) {
         val req = OneTimeWorkRequestBuilder<WidgetWorker>()
             .setInputData(workDataOf(OP to op))
-            .setConstraints(network)
+            .apply { if (requireNetwork) setConstraints(network) }
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(ctx).enqueueUniqueWork(unique, policy, req)
@@ -83,20 +100,32 @@ class WidgetWorker(private val ctx: Context, params: WorkerParameters) : Corouti
                     val id = WidgetStore.snapshot(ctx).state?.bookId ?: return Result.success()
                     api.patchState(id, sealed = false)
                 }
+                Work.OP_SETLEVEL -> {
+                    // el nivel ya se guardó (optimista) al tocar; se lo mandamos al servidor y
+                    // aplicamos la respuesta (cambia la leyenda del próximo capítulo según el nivel).
+                    val s = WidgetStore.snapshot(ctx).state ?: return Result.success()
+                    Sync.apply(ctx, api, api.patchState(s.bookId, level = s.spoilerLevel))
+                }
                 else -> api.widget()?.let { Sync.apply(ctx, api, it) }
             }
             Result.success()
         } catch (e: IOException) {
+            val userOp = op == Work.OP_ADVANCE || op == Work.OP_UNSEAL || op == Work.OP_SETLEVEL
             when {
-                op == Work.OP_ADVANCE && runAttemptCount >= 3 -> {
+                // acciones del usuario: reintenta un par de veces y, al rendirse, deja un error visible (nunca «busy» pegado)
+                userOp && runAttemptCount >= 3 -> {
                     Sync.fail(ctx, e.friendly())
                     Result.failure()
                 }
-                op == Work.OP_REFRESH -> Result.success() // el siguiente periodo lo reintenta
-                else -> Result.retry()
+                userOp -> Result.retry()
+                else -> {
+                    // refresh (periódico o manual): limpia cualquier «busy» y muestra que no hay conexión
+                    Sync.fail(ctx, e.friendly())
+                    Result.success()
+                }
             }
         } catch (e: ApiException) {
-            if (op == Work.OP_ADVANCE) Sync.fail(ctx, e.friendly())
+            Sync.fail(ctx, e.friendly())
             Result.failure()
         }
     }
