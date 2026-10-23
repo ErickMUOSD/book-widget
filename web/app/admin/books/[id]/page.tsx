@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PixelSprite } from "@/components/PixelSprite";
-import { ShareButton } from "@/components/ShareButton";
 import { WidgetCard } from "@/components/WidgetCard";
 import { api, send } from "@/lib/api";
 import { useApi, useLocalSetting, useWidgetController } from "@/lib/hooks";
@@ -256,8 +255,6 @@ export default function BookPage() {
                 })}>
                 🎲 Nuevo personaje
               </button>
-              <ShareButton bookId={id} sealed={true} title={b.title} className="btn-ghost" label="📤 Compartir sellada" />
-              <ShareButton bookId={id} sealed={false} title={b.title} className="btn-ghost" label="📤 Compartir revelada" />
             </div>
             {saving && <p className="text-sm opacity-70">Trabajando… generar el pixel art puede tardar unos segundos.</p>}
             {error && <p className="text-sm text-red-400">{error}</p>}
